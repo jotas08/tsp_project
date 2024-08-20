@@ -1,6 +1,8 @@
 import re
 import numpy as np
 
+#Usar Matplotlib e ReportLab para visualização do projeto
+
 class TSP:
 
     def __init__(self, **args):
@@ -48,6 +50,48 @@ class TSP:
 
         self.coords = np.array(self.coords)
 
+class TSPSolution:
+    def __init__(self, tour, coords, objective=None):
+        """
+        :param tour: Lista de inteiros representando a sequência de índices das cidades no tour.
+        :param coords: Array NumPy com as coordenadas das cidades.
+        :param objective: (Opcional) Custo ou distância total do tour. Se não fornecido, será calculado.
+        """
+        self.tour = tour
+        self.coords = coords
+        self.objective = objective if objective is not None else self.calculate_total_distance()
+
+    def calculate_total_distance(self):
+        """
+        Calcula a distância total do tour baseado nas coordenadas das cidades.
+        """
+        total_distance = 0
+        num_cities = len(self.tour)
+        for i in range(num_cities - 1):
+            total_distance += np.linalg.norm(self.coords[self.tour[i]] - self.coords[self.tour[i + 1]])
+        # Adiciona a distância para voltar ao ponto inicial
+        total_distance += np.linalg.norm(self.coords[self.tour[-1]] - self.coords[self.tour[0]])
+        return total_distance
+
+    def write_file(self, filename):
+        """
+        Escreve a solução TSP em um arquivo.
+        """
+        with open(filename, 'w') as f:
+            f.write('Tour:\n')
+            for index in self.tour:
+                f.write(f'{index + 1}: {self.coords[index][0]} {self.coords[index][1]}\n')
+            f.write(f'\nDistância Total: {self.objective}\n')
+
+    def __str__(self):
+        """
+        Representa a solução TSP como string.
+        """
+        s = 'Tour:\n'
+        for index in self.tour:
+            s += f'{index + 1}: {self.coords[index][0]} {self.coords[index][1]}\n'
+        s += f'\nDistância Total: {self.objective}\n'
+        return s
 
 if __name__ == '__main__':
     tsp = TSP(filename='ALL_tsp/kroE100.tsp')
