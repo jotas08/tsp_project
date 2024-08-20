@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+ALL_tsp/
 
 # Distribution / packaging
 .Python
