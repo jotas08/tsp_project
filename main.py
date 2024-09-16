@@ -25,7 +25,7 @@ class TSP:
         
         self.coords = np.array(self.coords)
         self.distance_matrix = self.calculate_distance_matrix()
-        self.total_distance = self.calculate_total_distance()
+        # self.total_distance = self.calculate_total_distance()
 
     def read_file(self, filename):
         with open(filename, 'r') as f:
@@ -58,21 +58,17 @@ class TSP:
         self.coords = np.array(self.coords)
         # self.coords = np.sqrt(((self.coords[:, np.newaxis, :] - self.coords[np.newaxis, :, :])**2).sum(axis=2))
 
-    def plot_tsp(self):
-        """Plota o percurso do TSP baseado no tour e nas coordenadas reais."""
-        # Extrai as coordenadas na ordem do tour
+    def plot_tsp(self,method, fobj):
         x = [self.coords[i][0] for i in self.tour] + [self.coords[self.tour[0]][0]]
         y = [self.coords[i][1] for i in self.tour] + [self.coords[self.tour[0]][1]]
 
-        # Plota o percurso
         plt.figure(figsize=(18, 18))
         plt.plot(x, y, marker='o', linestyle='-', color='b')
 
-        # Adiciona rótulos para cada cidade
         for i in range(len(self.tour)):
             plt.text(x[i], y[i], f'{self.tour[i] + 1}', fontsize=12, ha='right')
         
-        plt.title(f"Percurso do TSP {self.filename}")
+        plt.title(f"Percurso do TSP | Valor = {fobj} ({method})")
         plt.savefig('plot.png')
         plt.close()
 
@@ -80,13 +76,12 @@ class TSP:
         return np.sqrt(((self.coords[:, np.newaxis, :] - self.coords[np.newaxis, :, :]) ** 2).sum(axis=2))
         # distance_matrix = (distance_matrix * scale_factor).astype(int)
 
-    def calculate_total_distance(self):
-        distance = 0
-        for i in range(len(self.tour) - 1):
-            distance += self.distance_matrix[self.tour[i]][self.tour[i + 1]]
-        # Adicionar a distância de volta ao ponto de partida
-        distance += self.distance_matrix[self.tour[-1]][self.tour[0]]
-        return distance
+    # def calculate_total_distance(self):
+    #     distance = 0
+    #     for i in range(len(self.tour) - 1):
+    #         distance += self.distance_matrix[self.tour[i]][self.tour[i + 1]]
+    #     distance += self.distance_matrix[self.tour[-1]][self.tour[0]]
+    #     return distance
 
     def __str__(self):
         tour_str = ' -> '.join(map(str, [t + 1 for t in self.tour]))  # Ajusta para a notação 1-indexed
@@ -99,32 +94,26 @@ class TSP:
                 )
     
 class TSP_Solution:
-    '''Traveling Salesman Problem Solution'''
 
     def __init__(self, tsp, filename=None):
-        self.tsp = tsp  # Referência para a instância do problema TSP (contém a matriz de distâncias e as coordenadas)
-        # Lista de cidades na ordem do tour
-        self.tour = np.arange(tsp.dimension)  # Começa com as cidades na ordem (0, 1, 2, ..., n-1)
-        np.random.shuffle(self.tour)  # Solução inicial aleatória (embaralhada)
-        # Valor objetivo (distância total do percurso)
-        self.objective = self.calculate_total_distance()  # Calcula a distância total do percurso
+        self.tsp = tsp
+        self.tour = np.arange(tsp.dimension)
+        # np.random.shuffle(self.tour)
+        self.objective = self.calculate_total_distance()
         if filename:
             self.read_file(filename)
 
     def read_file(self, filename):
-        '''Lê o tour de um arquivo'''
         with open(filename, 'r') as f:
             self.tour = np.array(list(map(int, f.readline().split())))
             self.objective = float(f.readline())
 
     def write_file(self, filename):
-        '''Grava o tour em um arquivo'''
         with open(filename, 'w') as f:
             f.write(' '.join(map(str, self.tour)) + '\n')
             f.write(f'{self.objective}\n')
 
     def calculate_total_distance(self):
-        '''Calcula a distância total do percurso baseado no tour e na matriz de distâncias'''
         distance = 0
         for i in range(len(self.tour) - 1):
             distance += self.tsp.distance_matrix[self.tour[i], self.tour[i + 1]]
@@ -133,12 +122,10 @@ class TSP_Solution:
         return distance
 
     def evaluate(self):
-        '''Recalcula e retorna o valor objetivo (distância total) do tour atual'''
         self.objective = self.calculate_total_distance()
         return self.objective
 
     def is_valid(self):
-        '''Verifica se o tour é válido (se todas as cidades são visitadas exatamente uma vez e retorna ao início)'''
         if len(set(self.tour)) != len(self.tour):
             print('Tour inválido: cidades repetidas')
             return False
@@ -147,33 +134,27 @@ class TSP_Solution:
             return False
         return True
 
-    def reset(self):
-        '''Reseta a solução para uma solução aleatória'''
-        self.tour = np.arange(self.tsp.dimension)
-        np.random.shuffle(self.tour)
-        self.objective = self.calculate_total_distance()
+    # def reset(self):
+    #     self.tour = np.arange(self.tsp.dimension)
+    #     np.random.shuffle(self.tour)
+    #     self.objective = self.calculate_total_distance()
 
     def copy_from(self, other):
-        '''Copia o tour e o valor objetivo de outra solução TSP'''
         self.tour = other.tour.copy()
         self.objective = other.objective
 
     def swap(self, i, j):
-        '''Troca as cidades i e j no tour'''
         self.tour[i], self.tour[j] = self.tour[j], self.tour[i]
         self.objective = self.calculate_total_distance()  # Recalcula a distância após a troca
 
     def __str__(self):
-        '''Representação da solução (tour e distância total)'''
         tour_str = ' -> '.join(map(str, self.tour)) + f' -> {self.tour[0]}'
         return f'Tour: {tour_str}\nTotal Distance: {self.objective:.2f}'
 
     def __eq__(self, other):
-        '''Verifica se duas soluções são iguais (mesmo tour)'''
         return np.array_equal(self.tour, other.tour)
 
 class ConstructionHeuristics:
-    '''Construction Heuristics for the Traveling Salesman Problem'''
 
     def __init__(self, tsp):
         self.tsp = tsp
@@ -191,7 +172,7 @@ if __name__ == '__main__':
     sol = ConstructionHeuristics(tsp).random_solution()
     # sol.random_solution()
     tsp.tour = sol.tour
-    tsp.plot_tsp()
+    tsp.plot_tsp('random',sol.objective)
     # print(sol.objective)
     # print(sol.calculate_total_distance())
     
