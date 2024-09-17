@@ -25,7 +25,7 @@ class TSP:
         
         self.coords = np.array(self.coords)
         self.distance_matrix = self.calculate_distance_matrix()
-        # self.total_distance = self.calculate_total_distance()
+        self.total_distance = self.calculate_total_distance()
 
     def read_file(self, filename):
         with open(filename, 'r') as f:
@@ -76,12 +76,12 @@ class TSP:
         return np.sqrt(((self.coords[:, np.newaxis, :] - self.coords[np.newaxis, :, :]) ** 2).sum(axis=2))
         # distance_matrix = (distance_matrix * scale_factor).astype(int)
 
-    # def calculate_total_distance(self):
-    #     distance = 0
-    #     for i in range(len(self.tour) - 1):
-    #         distance += self.distance_matrix[self.tour[i]][self.tour[i + 1]]
-    #     distance += self.distance_matrix[self.tour[-1]][self.tour[0]]
-    #     return distance
+    def calculate_total_distance(self):
+        distance = 0
+        for i in range(len(self.tour) - 1):
+            distance += self.distance_matrix[self.tour[i]][self.tour[i + 1]]
+        distance += self.distance_matrix[self.tour[-1]][self.tour[0]]
+        return distance
 
     def __str__(self):
         tour_str = ' -> '.join(map(str, [t + 1 for t in self.tour]))  # Ajusta para a notação 1-indexed
@@ -166,14 +166,39 @@ class ConstructionHeuristics:
         np.random.shuffle(solution.tour)
         solution.evaluate()
         return solution
+    
+    def greedy(self, start_city=0):
+        solution = TSP_Solution(self.tsp)
+        
+        # Marca todas as cidades como não visitadas
+        visited = np.zeros(self.tsp.dimension, dtype=bool)
+        # Inicia o tour na cidade escolhida
+        current_city = start_city
+        solution.tour[0] = current_city  # Primeira cidade no tour
+        visited[current_city] = True  # Marca a cidade inicial como visitada
+
+        for i in range(1, self.tsp.dimension):
+            # Encontra a cidade mais próxima que ainda não foi visitada
+            nearest_city = None
+            min_distance = np.inf
+            for j in range(self.tsp.dimension):
+                if not visited[j] and self.tsp.distance_matrix[current_city, j] < min_distance:
+                    nearest_city = j
+                    min_distance = self.tsp.distance_matrix[current_city, j]
+            
+            # Adiciona a cidade mais próxima ao tour
+            solution.tour[i] = nearest_city
+            visited[nearest_city] = True  # Marca como visitada
+            current_city = nearest_city  # Atualiza a cidade atual
+
+        # Fecha o ciclo, retornando à cidade inicial
+        solution.evaluate()
+        return solution
 
 if __name__ == '__main__':
     tsp = TSP(filename='ALL_tsp/a280.tsp')
-    sol = ConstructionHeuristics(tsp).random_solution()
+    # tsp.plot_tsp('initial state', tsp.total_distance)
+    sol = ConstructionHeuristics(tsp).greedy()
     # sol.random_solution()
     tsp.tour = sol.tour
-    tsp.plot_tsp('random',sol.objective)
-    # print(sol.objective)
-    # print(sol.calculate_total_distance())
-    
-    # tsp.plot_tsp()
+    tsp.plot_tsp('greedy',sol.objective)
