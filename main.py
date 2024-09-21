@@ -2,8 +2,7 @@ import re
 import numpy as np
 import matplotlib.pyplot as plt
 
-#Usar Matplotlib e ReportLab para visualização do projeto
-#matriz de distancia
+#Traveling Salesman Problem = Caixeiro Viajante
 
 
 class TSP:
@@ -69,7 +68,7 @@ class TSP:
             plt.text(x[i], y[i], f'{self.tour[i] + 1}', fontsize=12, ha='right')
         
         plt.title(f"Percurso do TSP | Valor = {fobj} ({method})")
-        plt.savefig('plot.png')
+        plt.savefig(f'{method}.png')
         plt.close()
 
     def calculate_distance_matrix(self):
@@ -145,7 +144,7 @@ class TSP_Solution:
 
     def swap(self, i, j):
         self.tour[i], self.tour[j] = self.tour[j], self.tour[i]
-        self.objective = self.calculate_total_distance()  # Recalcula a distância após a troca
+        self.objective = self.calculate_total_distance()
 
     def __str__(self):
         tour_str = ' -> '.join(map(str, self.tour)) + f' -> {self.tour[0]}'
@@ -158,7 +157,6 @@ class ConstructionHeuristics:
 
     def __init__(self, tsp):
         self.tsp = tsp
-        # Lista de cidades (índices) para embaralhar e gerar soluções aleatórias
         self.cities = np.arange(tsp.dimension)
 
     def random_solution(self):
@@ -170,15 +168,12 @@ class ConstructionHeuristics:
     def greedy(self, start_city=0):
         solution = TSP_Solution(self.tsp)
         
-        # Marca todas as cidades como não visitadas
         visited = np.zeros(self.tsp.dimension, dtype=bool)
-        # Inicia o tour na cidade escolhida
         current_city = start_city
-        solution.tour[0] = current_city  # Primeira cidade no tour
-        visited[current_city] = True  # Marca a cidade inicial como visitada
+        solution.tour[0] = current_city
+        visited[current_city] = True
 
         for i in range(1, self.tsp.dimension):
-            # Encontra a cidade mais próxima que ainda não foi visitada
             nearest_city = None
             min_distance = np.inf
             for j in range(self.tsp.dimension):
@@ -186,19 +181,92 @@ class ConstructionHeuristics:
                     nearest_city = j
                     min_distance = self.tsp.distance_matrix[current_city, j]
             
-            # Adiciona a cidade mais próxima ao tour
             solution.tour[i] = nearest_city
-            visited[nearest_city] = True  # Marca como visitada
-            current_city = nearest_city  # Atualiza a cidade atual
+            visited[nearest_city] = True
+            current_city = nearest_city
 
-        # Fecha o ciclo, retornando à cidade inicial
         solution.evaluate()
         return solution
 
+class LocalSearch:
+    '''Local Search for the Traveling Salesman Problem (TSP)'''
+
+    def __init__(self, tsp):
+        self.tsp = tsp
+
+    def two_opt(self, sol, first_improvement=True):
+        ''' 
+        Aplica a heurística 2-opt para melhorar o tour atual.
+        
+        Parameters:
+            sol: TSP_Solution - a solução atual a ser melhorada
+            first_improvement: bool (default True) - se True, para na primeira melhoria encontrada.
+        
+        Returns:
+            bool - True se a solução foi melhorada, False caso contrário.
+        '''
+        best_distance = sol.objective
+        tour = sol.tour
+        improved = False
+
+        # Tenta todas as combinações de pares de arestas (i, k)
+        for i in range(1, len(tour) - 2):
+            for k in range(i + 1, len(tour) - 1):
+                # Calcula a mudança de distância ao trocar as arestas
+                delta = self.calculate_2opt_gain(tour, i, k)
+
+                # Se a mudança reduzir a distância total
+                if delta < 0:
+                    # Inverte a subsequência do tour entre i e k
+                    tour[i:k+1] = list(reversed(tour[i:k+1]))
+                    sol.evaluate()  # Recalcula a distância total
+                    improved = True
+
+                    if first_improvement:
+                        return True  # Para na primeira melhoria se first_improvement for True
+
+        return improved  # Retorna True se o tour foi melhorado
+
+    def calculate_2opt_gain(self, tour, i, k):
+        '''
+        Calcula o ganho de distância que resultaria da inversão da subsequência entre i e k.
+        
+        Parameters:
+            tour: lista de cidades no tour atual
+            i, k: inteiros, índices das arestas a serem trocadas
+        
+        Returns:
+            float - o ganho de distância (negativo se melhorar, positivo se piorar)
+        '''
+        # Acessa as cidades nos pontos i, k e nos pontos seguintes (para formar as arestas)
+        city1, city2 = tour[i - 1], tour[i]
+        city3, city4 = tour[k], tour[k + 1]
+
+        # Calcula a diferença de distância ao trocar as arestas
+        old_cost = self.tsp.distance_matrix[city1, city2] + self.tsp.distance_matrix[city3, city4]
+        new_cost = self.tsp.distance_matrix[city1, city3] + self.tsp.distance_matrix[city2, city4]
+
+        return new_cost - old_cost
+
+# class Metaheuristics:
+
+
+
 if __name__ == '__main__':
     tsp = TSP(filename='ALL_tsp/a280.tsp')
-    # tsp.plot_tsp('initial state', tsp.total_distance)
+    # tsp.plot_tsp('initial_state', tsp.total_distance)
     sol = ConstructionHeuristics(tsp).greedy()
-    # sol.random_solution()
     tsp.tour = sol.tour
     tsp.plot_tsp('greedy',sol.objective)
+    # sol = ConstructionHeuristics(tsp).random_solution()
+    # tsp.tour = sol.tour
+    # tsp.plot_tsp('random',sol.objective)
+    local_search = LocalSearch(tsp)
+    improved = local_search.two_opt(sol)  # Passa a solução aleatória para 2-opt
+
+    # Atualiza o tour e plota a solução após o 2-opt
+    if improved:
+        tsp.tour = sol.tour  # Atualiza o tour no TSP com o novo tour melhorado
+        tsp.plot_tsp('2opt_improved', sol.objective)  # Plota a solução melhorada
+    else:
+        print("Nenhuma melhoria foi encontrada com 2-opt.")
