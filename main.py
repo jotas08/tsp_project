@@ -214,10 +214,7 @@ class LocalSearch:
             for k in range(i + 1, len(tour) - 1):
                 # Calcula a mudança de distância ao trocar as arestas
                 delta = self.calculate_2opt_gain(tour, i, k)
-
-                # Se a mudança reduzir a distância total
                 if delta < 0:
-                    # Inverte a subsequência do tour entre i e k
                     tour[i:k+1] = list(reversed(tour[i:k+1]))
                     sol.evaluate()  # Recalcula a distância total
                     improved = True
@@ -226,7 +223,7 @@ class LocalSearch:
                         return True  # Para na primeira melhoria se first_improvement for True
 
         return improved  # Retorna True se o tour foi melhorado
-
+    
     def calculate_2opt_gain(self, tour, i, k):
         '''
         Calcula o ganho de distância que resultaria da inversão da subsequência entre i e k.
@@ -247,6 +244,62 @@ class LocalSearch:
         new_cost = self.tsp.distance_matrix[city1, city3] + self.tsp.distance_matrix[city2, city4]
 
         return new_cost - old_cost
+    
+    def swap(self, sol, first_improvement=True):
+        '''Tenta melhorar a solução trocando duas cidades no tour.'''
+        tour = sol.tour
+        improved = False
+
+        for i in range(1, len(tour) - 1):
+            for j in range(i + 1, len(tour)):
+                # Calcula a mudança de distância ao trocar duas cidades
+                old_distance = self.calculate_swap_cost(tour, i, j)
+                tour[i], tour[j] = tour[j], tour[i]  # Troca as cidades
+                sol.evaluate()  # Recalcula a distância após a troca
+
+                if sol.objective < old_distance:
+                    improved = True
+                    if first_improvement:
+                        return True  # Para na primeira melhoria
+                else:
+                    # Desfaz a troca se não houver melhoria
+                    tour[i], tour[j] = tour[j], tour[i]
+        return improved
+    
+    def calculate_swap_cost(self, tour, i, j):
+        '''Calcula o impacto da troca de duas cidades no tour.'''
+        city_before_i = tour[i - 1] if i > 0 else tour[-1]
+        city_after_i = tour[i + 1] if i < len(tour) - 1 else tour[0]
+        city_before_j = tour[j - 1] if j > 0 else tour[-1]
+        city_after_j = tour[j + 1] if j < len(tour) - 1 else tour[0]
+
+        # Cálculo das distâncias atuais
+        current_cost = (self.tsp.distance_matrix[city_before_i, tour[i]] + self.tsp.distance_matrix[tour[i], city_after_i] +
+                        self.tsp.distance_matrix[city_before_j, tour[j]] + self.tsp.distance_matrix[tour[j], city_after_j])
+
+        # Cálculo das distâncias após a troca
+        new_cost = (self.tsp.distance_matrix[city_before_i, tour[j]] + self.tsp.distance_matrix[tour[j], city_after_i] +
+                    self.tsp.distance_matrix[city_before_j, tour[i]] + self.tsp.distance_matrix[tour[i], city_after_j])
+
+        return new_cost - current_cost
+    
+    def VND(self, sol, first_improvement=True):
+        '''Variable Neighborhood Descent para o TSP combinando two_opt e swap.'''
+        any_improved = False
+
+        while True:
+            improved = False
+            # Aplica 2-opt e depois swap, reiniciando quando uma melhoria for encontrada
+            if self.two_opt(sol, first_improvement):
+                improved = True
+            if self.swap(sol, first_improvement):
+                improved = True
+
+            if not improved:
+                break  # Para quando nenhuma melhoria é encontrada
+            any_improved = True
+
+        return any_improved
 
 # class Metaheuristics:
 
@@ -262,11 +315,11 @@ if __name__ == '__main__':
     # tsp.tour = sol.tour
     # tsp.plot_tsp('random',sol.objective)
     local_search = LocalSearch(tsp)
-    improved = local_search.two_opt(sol)  # Passa a solução aleatória para 2-opt
+    improved = local_search.VND(sol)
 
     # Atualiza o tour e plota a solução após o 2-opt
     if improved:
         tsp.tour = sol.tour  # Atualiza o tour no TSP com o novo tour melhorado
-        tsp.plot_tsp('2opt_improved', sol.objective)  # Plota a solução melhorada
+        tsp.plot_tsp('VND', sol.objective)  # Plota a solução melhorada
     else:
         print("Nenhuma melhoria foi encontrada com 2-opt.")
