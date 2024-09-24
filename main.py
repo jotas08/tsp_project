@@ -3,8 +3,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
-#Traveling Salesman Problem = Caixeiro Viajante
-
+import heapq
 
 class TSP:
     def __init__(self, **args):
@@ -134,10 +133,10 @@ class TSP_Solution:
             return False
         return True
 
-    # def reset(self):
-    #     self.tour = np.arange(self.tsp.dimension)
-    #     np.random.shuffle(self.tour)
-    #     self.objective = self.calculate_total_distance()
+    def reset(self):
+        self.tour = np.arange(self.tsp.dimension)
+        np.random.shuffle(self.tour)
+        self.objective = self.calculate_total_distance()
 
     def copy_from(self, other):
         self.tour = other.tour.copy()
@@ -579,7 +578,145 @@ class Metaheuristics:
 
         return best  # Retorna a melhor solução encontrada
 
+    @staticmethod
+    def SA(tsp, max_tries=1000, first_imp=True, T0=1e3, alpha=0.99):
+        '''Simulated Annealing para o TSP.
+        
+        Parameters:
+            tsp: TSP - o problema do TSP a ser resolvido
+            max_tries: int (default 1000) - número máximo de tentativas sem melhoria
+            first_imp: bool (default True) - se True, a busca local usará a primeira melhoria encontrada
+            T0: float (default 1e3) - temperatura inicial
+            alpha: float (default 0.99) - fator de resfriamento (cooling factor)
+        
+        Returns:
+            TSP_Solution - a melhor solução encontrada
+        '''
+        # Heurística de construção: gera uma solução inicial gulosa
+        ch = ConstructionHeuristics(tsp)
+        best = ch.greedy()  # Gera a solução inicial
+        ls = LocalSearch(tsp)
 
+        # Aplica a busca local (VND) na solução inicial
+        ls.VND(best, first_imp)
+        current = TSP_Solution(tsp)
+        current.copy_from(best)  # A solução atual começa como a melhor solução
+        sol = TSP_Solution(tsp)  # Solução temporária usada para as perturbações
+
+        ite = 0
+        print('SA inicial:', best.objective)
+
+        # Simulated Annealing Loop
+        while ite < max_tries:
+            ite += 1
+
+            # Copia a solução atual para a temporária
+            sol.copy_from(current)
+
+            # Perturbação: troca 2 cidades aleatórias no tour
+            i, j = np.random.choice(len(sol.tour), size=2, replace=False)
+            sol.tour[i], sol.tour[j] = sol.tour[j], sol.tour[i]
+            sol.evaluate()  # Recalcula a distância total do tour
+
+            # Calcula a diferença entre a nova solução e a atual
+            delta = (sol.objective - current.objective) / best.objective
+
+            # Aceita a nova solução se for melhor ou com uma certa probabilidade
+            if delta < -1e-3 or np.random.rand() < np.exp(-delta / T0):
+                current.copy_from(sol)  # Aceita a nova solução
+
+                # Se a nova solução for melhor que a melhor solução encontrada, atualiza
+                if current.objective + 1e-6 < best.objective:
+                    best.copy_from(current)
+                    ite = 0  # Reinicia o contador de tentativas sem melhoria
+                    if __debug__:
+                        print('SA melhorado:', best.objective)
+
+            # Resfriamento: reduz a temperatura
+            T0 *= alpha
+
+        return best  # Retorna a melhor solução encontrada
+
+    @staticmethod
+    def GRASP(tsp, max_tries=1000, first_imp=True, K=10):
+        '''Greedy Randomized Adaptive Search Procedure para o TSP.
+        
+        Parameters:
+            tsp: TSP - o problema do TSP a ser resolvido
+            max_tries: int (default 1000) - número máximo de tentativas sem melhoria
+            first_imp: bool (default True) - se True, a busca local usará a primeira melhoria encontrada
+            K: int (default 10) - número de candidatos a serem considerados na construção gulosa randomizada
+        
+        Returns:
+            TSP_Solution - a melhor solução encontrada
+        '''
+
+        # Função que realiza a construção gulosa randomizada
+        def greedy_randomized(solution):
+            n = len(tsp.coords)  # Número de cidades
+            visited = [False] * n  # Marca as cidades visitadas
+            solution.reset()  # Reinicializa a solução
+
+            # Começa na cidade 0
+            current_city = 0
+            visited[current_city] = True
+            solution.tour[0] = current_city  # Define a primeira cidade no tour
+
+            # Itera para construir o tour
+            for i in range(1, n):
+                candidates = []
+
+                # Para cada cidade não visitada, calcula o custo de inserção
+                for j in range(n):
+                    if not visited[j]:
+                        # Custo da cidade j
+                        cost = tsp.distance_matrix[current_city][j]
+                        heapq.heappush(candidates, (cost, j))
+
+                        # Mantém apenas os K melhores candidatos
+                        if len(candidates) > K:
+                            heapq.heappop(candidates)
+
+                # Escolhe aleatoriamente um dos K melhores candidatos
+                _, next_city = candidates[np.random.randint(len(candidates))]
+
+                # Atualiza o tour com a cidade selecionada
+                solution.tour[i] = next_city
+                visited[next_city] = True  # Marca como visitada
+                current_city = next_city  # Atualiza a cidade atual
+
+            solution.evaluate()  # Avalia a solução gerada
+
+        # GRASP main loop
+        ch = ConstructionHeuristics(tsp)
+        best = ch.greedy()  # Gera uma solução inicial gulosa
+        ls = LocalSearch(tsp)
+        ls.VND(best, first_imp)  # Aplica a busca local na solução inicial
+
+        sol = TSP_Solution(tsp)  # Solução de trabalho
+
+        ite = 0
+        while ite < max_tries:
+            ite += 1
+
+            # Gera uma solução gulosa randomizada
+            greedy_randomized(sol)
+
+            # Aplica busca local à solução gerada
+            ls.VND(sol, first_imp)
+
+            # Se a nova solução for melhor que a melhor solução encontrada, atualiza
+            if sol.objective + 1e-6 < best.objective:
+                best.copy_from(sol)
+                ite = 0  # Reinicia o contador de tentativas sem melhoria
+
+                if __debug__:
+                    print('GRASP melhorado:', best.objective)
+
+        return best  # Retorna a melhor solução encontrada
+
+# class MIP:
+#p-meta
 
 if __name__ == '__main__':
     ini = time.time()
@@ -602,8 +739,10 @@ if __name__ == '__main__':
     # best_sol = Metaheuristics.RMS(tsp,max_tries=1000,first_imp=True,timeout=30)
     # best_sol = Metaheuristics.ILS(tsp,max_tries=50,first_imp=True, k=2)
     # best_sol = Metaheuristics.VNS(tsp, max_tries=100, first_imp=True)
-    best_sol = Metaheuristics.Tabu(tsp, max_tries=1000, first_imp=True, tenure=10)
+    # best_sol = Metaheuristics.Tabu(tsp, max_tries=1000, first_imp=True, tenure=10)
+    # best_sol = Metaheuristics.SA(tsp, max_tries=1000, first_imp=True, T0=1e3, alpha=0.99)
+    best_sol = Metaheuristics.GRASP(tsp, max_tries=200, first_imp=True, K=10)
 
     tsp.tour = best_sol.tour
-    tsp.plot_tsp('TABU',best_sol.objective)
+    tsp.plot_tsp('GRASP',best_sol.objective)
     print('Tempo total = ',time.time() - ini,"\n",best_sol)
