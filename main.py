@@ -93,6 +93,7 @@ class TSP:
                 )
     
 class TSP_Solution:
+    '''Classe necessária para armazenamento e manipulação do TSP'''
 
     def __init__(self, tsp, filename=None):
         self.tsp = tsp
@@ -159,6 +160,7 @@ class ConstructionHeuristics:
         self.tsp = tsp
         self.cities = np.arange(tsp.dimension)
 
+    '''Construtor aleatório de solução: rápido mas pouco efetivo, damos apenas um shuffle'''
     def random_solution(self):
         solution = TSP_Solution(self.tsp)
         np.random.shuffle(solution.tour)
@@ -179,48 +181,22 @@ class ConstructionHeuristics:
 
         return nearest_city
     
-    # def greedy(self, start_city=0):
-    #     solution = TSP_Solution(self.tsp)
-        
-    #     visited = np.zeros(self.tsp.dimension, dtype=bool)
-    #     current_city = start_city
-    #     solution.tour[0] = current_city
-    #     visited[current_city] = True
-
-    #     for i in range(1, self.tsp.dimension):
-    #         nearest_city = None
-    #         min_distance = np.inf
-    #         for j in range(self.tsp.dimension):
-    #             if not visited[j] and self.tsp.distance_matrix[current_city, j] < min_distance:
-    #                 nearest_city = j
-    #                 min_distance = self.tsp.distance_matrix[current_city, j]
-            
-    #         solution.tour[i] = nearest_city
-    #         visited[nearest_city] = True
-    #         current_city = nearest_city
-
-    #     solution.evaluate()
-    #     return solution
-    
     def greedy(self):
-        '''Heurística gulosa para gerar uma solução inicial para o TSP.'''
+        '''Heurística gulosa para gerar uma solução inicial para o TSP.
+            Consiste em procurar a cidade mais próxima a ser visitada, sem se importar com o caminho percorrido'''
         n = len(self.tsp.coords)  # Número de cidades
         visited = [False] * n  # Marca as cidades visitadas
 
-        # Inicializa uma solução para o TSP
         solution = TSP_Solution(self.tsp)
         solution.tour = [-1] * n  # Inicializa o tour com valores inválidos
 
-        # Começa na cidade 0
         current_city = 0
         visited[current_city] = True  # Marca a cidade como visitada
         solution.tour[0] = current_city  # Define a primeira cidade no tour
 
         for i in range(1, n):
-            # Encontra a cidade mais próxima não visitada
             nearest_city = self.find_nearest_city(current_city, visited)
 
-            # Verifica se uma cidade válida foi encontrada
             if nearest_city is None:
                 raise ValueError(f"Nenhuma cidade válida encontrada na iteração {i}. Verifique a função find_nearest_city.")
 
@@ -229,8 +205,8 @@ class ConstructionHeuristics:
             visited[nearest_city] = True  # Marca a cidade como visitada
             current_city = nearest_city  # Atualiza a cidade atual
 
-        solution.evaluate()  # Avalia a distância total do tour
-        return solution  # Retorna a solução gerada
+        solution.evaluate()
+        return solution
 
 class LocalSearch:
     '''Local Search for the Traveling Salesman Problem (TSP)'''
@@ -240,14 +216,8 @@ class LocalSearch:
 
     def two_opt(self, sol, first_improvement=True):
         ''' 
-        Aplica a heurística 2-opt para melhorar o tour atual.
-        
-        Parameters:
-            sol: TSP_Solution - a solução atual a ser melhorada
-            first_improvement: bool (default True) - se True, para na primeira melhoria encontrada.
-        
-        Returns:
-            bool - True se a solução foi melhorada, False caso contrário.
+        Aplica o método 2-opt a fim de eliminar os cruzamentos.
+        Consiste em remover duas arestas do tour e reconectando-as de forma diferente, gerando uma nova solução
         '''
         best_distance = sol.objective
         tour = sol.tour
@@ -266,7 +236,7 @@ class LocalSearch:
                     if first_improvement:
                         return True  # Para na primeira melhoria se first_improvement for True
 
-        return improved  # Retorna True se o tour foi melhorado
+        return improved
     
     def calculate_2opt_gain(self, tour, i, k):
         city1, city2 = tour[i - 1], tour[i]
@@ -277,6 +247,8 @@ class LocalSearch:
 
         return new_cost - old_cost
     
+    '''Diferente do 2-opt, com o swap tentamos trocar a posição de duas cidades, sem alterar a ordem das outras
+        Ex: A->B->C->D->E->F, trocando B e E = A->E->C->D->B->F'''
     def swap(self, sol, first_improvement=True):
         '''Tenta melhorar a solução trocando duas cidades no tour.'''
         tour = sol.tour
@@ -315,7 +287,9 @@ class LocalSearch:
         return new_cost - current_cost
     
     def VND(self, sol, first_improvement=True):
-        '''Variable Neighborhood Descent para o TSP combinando two_opt e swap.'''
+        '''Variable Neighborhood Descent
+            Consiste em utilizar vizinhanças geradas por algum método como o guloso ou randômico, e em seguida aplicar
+            alguma perturbação para verificar se a solução é melhorada'''
         any_improved = False
 
         while True:
@@ -336,19 +310,15 @@ class Metaheuristics:
     def __init__(self):
         pass
 
+    '''Serão todos métodos estáticos para que não tenha a necessidade de criação de instância para utilizá-los,
+        tornando-os independentes'''
+
     @staticmethod
     def RMS(tsp, max_tries=1000, first_imp=True,timeout=None):
-        '''Randomized Multi-Start, uma metaheurística que combina heurísticas de construção e métodos de busca local.
-        
-        Parameters:
-            tsp: TSP - o problema do TSP a ser resolvido
-            max_tries: int (default 1000) - máximo de tentativas sem melhoria
-            first_imp: bool (default True) - se True, a busca local usará a primeira melhoria encontrada
-        
-        Returns:
-            TSP_Solution - a melhor solução encontrada
+        '''Randomized Multi-Start,
+            Consiste em gerar diversos pontos de partida aleatórios e aplicar a busca local para cada um deles,
+            em seguida verificamos qual solução foi a melhor
         '''
-        # Inicializa as heurísticas de construção e busca local
         ch = ConstructionHeuristics(tsp)
         ls = LocalSearch(tsp)
         
@@ -398,16 +368,8 @@ class Metaheuristics:
 
     @staticmethod
     def ILS(tsp, max_tries=1000, first_imp=True, k=2):
-        '''Iterated Local Search para o TSP.
-        
-        Parameters:
-            tsp: TSP - o problema do TSP a ser resolvido
-            max_tries: int (default 1000) - máximo de tentativas sem melhoria
-            first_imp: bool (default True) - se True, a busca local usará a primeira melhoria encontrada
-            k: int (default 2) - número de perturbações (quantas trocas de cidades fazer durante a perturbação)
-        
-        Returns:
-            TSP_Solution - a melhor solução encontrada
+        '''Iterated Local Search
+            Consiste em combinar a busca local com perturbações controladas, fazendo pequenas mudanças na solução
         '''
         ch = ConstructionHeuristics(tsp)
         ls = LocalSearch(tsp)
@@ -443,15 +405,9 @@ class Metaheuristics:
 
     @staticmethod
     def VNS(tsp, max_tries=1000, first_imp=True):
-        '''Variable Neighborhood Search para o TSP.
-        
-        Parameters:
-            tsp: TSP - o problema do TSP a ser resolvido
-            max_tries: int (default 1000) - máximo de tentativas sem melhoria
-            first_imp: bool (default True) - se True, a busca local usará a primeira melhoria encontrada
-        
-        Returns:
-            TSP_Solution - a melhor solução encontrada
+        '''Variable Neighborhood Search
+            Consiste em ter diversas vizinhanças variáveis, utilizando diferentes tipos de busca local quando uma
+            vizinhança não oferece melhorias
         '''
         ch = ConstructionHeuristics(tsp)
         ls = LocalSearch(tsp)
@@ -496,16 +452,12 @@ class Metaheuristics:
 
     @staticmethod
     def Tabu(tsp, max_tries=1000, first_imp=True, tenure=10):
-        '''Tabu Search para o TSP.
-        
+        '''Tabu Search
+            Consiste em evitar revisitar soluções que já foram exploradas recentemente,
+            por isso usamos uma lista de tabus com "movimentos proibidos", evitando que o processo fique estagnado
+
         Parameters:
-            tsp: TSP - o problema do TSP a ser resolvido
-            max_tries: int (default 1000) - número máximo de tentativas sem melhoria
-            first_imp: bool (default True) - se True, a busca local usará a primeira melhoria encontrada
             tenure: int (default 10) - número de iterações que uma regra é considerada tabu
-        
-        Returns:
-            TSP_Solution - a melhor solução encontrada
         '''
         tabu_list = deque(maxlen=tenure)  # Lista tabu com capacidade limitada pelo tenure
 
@@ -580,17 +532,13 @@ class Metaheuristics:
 
     @staticmethod
     def SA(tsp, max_tries=1000, first_imp=True, T0=1e3, alpha=0.99):
-        '''Simulated Annealing para o TSP.
+        '''Simulated Annealing
+            Nos remete ao recozimento de metais, aceitando soluções piores com uma probabilidade, mas se tornando seletivo
+            com o decorrer do processo
         
         Parameters:
-            tsp: TSP - o problema do TSP a ser resolvido
-            max_tries: int (default 1000) - número máximo de tentativas sem melhoria
-            first_imp: bool (default True) - se True, a busca local usará a primeira melhoria encontrada
             T0: float (default 1e3) - temperatura inicial
             alpha: float (default 0.99) - fator de resfriamento (cooling factor)
-        
-        Returns:
-            TSP_Solution - a melhor solução encontrada
         '''
         # Heurística de construção: gera uma solução inicial gulosa
         ch = ConstructionHeuristics(tsp)
@@ -639,16 +587,11 @@ class Metaheuristics:
 
     @staticmethod
     def GRASP(tsp, max_tries=1000, first_imp=True, K=10):
-        '''Greedy Randomized Adaptive Search Procedure para o TSP.
+        '''Greedy Randomized Adaptive Search Procedure
+            Consiste em uma abordagem gulosa com randomização controlada
         
         Parameters:
-            tsp: TSP - o problema do TSP a ser resolvido
-            max_tries: int (default 1000) - número máximo de tentativas sem melhoria
-            first_imp: bool (default True) - se True, a busca local usará a primeira melhoria encontrada
             K: int (default 10) - número de candidatos a serem considerados na construção gulosa randomizada
-        
-        Returns:
-            TSP_Solution - a melhor solução encontrada
         '''
 
         # Função que realiza a construção gulosa randomizada
